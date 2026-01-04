@@ -5,8 +5,9 @@ from django.shortcuts import get_object_or_404
 from django.db import transaction
 
 from .models import Project, Task
-from .serializers import ProjectSerializer
+from .serializers import ProjectSerializer 
 from .agents.planner import generate_task_plan
+from .agents.scheduler import recalculate_timeline
 
 
 class ProjectListAPIView(APIView):
@@ -84,3 +85,59 @@ class ProjectDetailAPIView(APIView):
             {"message": f"Project '{project_title}' deleted successfully"},
             status=status.HTTP_204_NO_CONTENT
         )
+        
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework import status
+from django.shortcuts import get_object_or_404
+from django.db import transaction
+
+from .models import Project, Task
+from .serializers import ProjectSerializer, TaskSerializer
+from .agents.planner import generate_task_plan
+from .agents.scheduler import recalculate_timeline
+
+
+class TaskUpdateAPIView(APIView):
+    """
+    PATCH /api/tasks/<id>/ - Update task status
+    """
+    def patch(self, request, pk):
+        task = get_object_or_404(Task, pk=pk)
+        old_status = task.status
+        new_status = request.data.get('status')
+        
+        if not new_status:
+            return Response(
+                {"error": "Status is required"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        with transaction.atomic():
+            # Update task status
+            task.status = new_status
+            
+            # Timestamps are now set automatically by signals! 🎉
+            task.save()
+            
+            # Update project's actual days spent if task was completed
+            if new_status == 'completed' and old_status != 'completed':
+                if task.actual_days:
+                    project = task.project
+                    project.actual_days_spent += task.actual_days
+                    project.save()
+            
+            # Recalculate timeline if task was completed
+            recalculation_result = None
+            if new_status == 'completed':
+                recalculation_result = recalculate_timeline(task.project)
+        
+        response_data = {
+            'task': TaskSerializer(task).data,
+            'message': f"Task '{task.title}' marked as {new_status}",
+        }
+        
+        if recalculation_result:
+            response_data['timeline_update'] = recalculation_result
+        
+        return Response(response_data, status=status.HTTP_200_OK)

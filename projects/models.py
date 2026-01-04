@@ -1,6 +1,5 @@
 from django.db import models
-
-# Create your models here.
+from django.utils import timezone
 
 class Project(models.Model):
     STATUS_CHOICES = [
@@ -8,7 +7,6 @@ class Project(models.Model):
         ('active', 'Active'),
         ('completed', 'Completed'),
     ]
-    
     
     title = models.CharField(max_length=255)
     goal = models.TextField()
@@ -20,10 +18,37 @@ class Project(models.Model):
         default='planning'
     )
     
+    total_estimated_days = models.IntegerField(default=0) 
+    actual_days_spent = models.IntegerField(default=0)
+    
 
     def __str__(self):
-        return self.name
+        return self.title
     
+    def calculate_total_estimated_days(self):
+        """Calculate total estimated days from all tasks"""
+        total = self.tasks.aggregate(
+            models.Sum('estimated_days')
+        )['estimated_days__sum'] or 0
+        self.total_estimated_days = total
+        self.save()
+        return total
+    
+    def calculate_new_deadline(self):
+        """Calculate deadline based on remaining tasks"""
+        remaining_days = self.tasks.filter(
+            status__in=['pending', 'in_progress', 'blocked']
+        ).aggregate(
+            models.Sum('estimated_days')
+        )['estimated_days__sum'] or 0
+        
+        # Add buffer (10% extra time for safety)
+        remaining_days = int(remaining_days * 1.1)
+        
+        new_deadline = timezone.now().date() + timezone.timedelta(days=remaining_days)
+        return new_deadline, remaining_days
+    
+
 class Task(models.Model):
     STATUS_CHOICES = [
         ('pending', 'Pending'),
@@ -31,6 +56,7 @@ class Task(models.Model):
         ('blocked', 'Blocked'),
         ('completed', 'Completed'),
     ]
+    
     project = models.ForeignKey(
         Project,
         related_name='tasks',
@@ -46,5 +72,13 @@ class Task(models.Model):
     )
     order = models.IntegerField(default=0)
     
+    # NEW FIELDS
+    actual_days = models.IntegerField(null=True, blank=True)  # Actual time taken
+    completed_at = models.DateTimeField(null=True, blank=True)  # When completed
+    started_at = models.DateTimeField(null=True, blank=True)    # When started
+    
     def __str__(self):
         return f"{self.project.title} - {self.title}"
+    
+    class Meta:
+        ordering = ['order']  # Always return tasks in order
