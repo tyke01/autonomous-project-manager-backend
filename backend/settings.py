@@ -130,11 +130,6 @@ USE_TZ = True
 
 STATIC_URL = 'static/'
 
-# REST_FRAMEWORK = {
-#     'DEFAULT_AUTHENTICATION_CLASSES': (
-#         'users.authentication.CookieJWTauthentication',
-#     )
-# }
 
 # Development CORS settings
 CORS_ALLOWED_ORIGINS = [
@@ -143,4 +138,4 @@ CORS_ALLOWED_ORIGINS = [
 ]
 
 PLANNER_AI_MODEL = config(
-    'PLANNER_AI_MODEL', default='nvidia/nemotron-3-nano-30b-a3b:free')
+    'PLANNER_AI_MODEL', default='xiaomi/mimo-v2-flash:free')

@@ -1,4 +1,4 @@
-from django.db.models.signals import pre_save
+from django.db.models.signals import pre_save, post_save, post_delete
 from django.dispatch import receiver
 from django.utils import timezone
 from .models import Task
@@ -42,3 +42,20 @@ def auto_set_task_timestamps(sender, instance, **kwargs):
         # New task being created - set started_at if status is in_progress
         if instance.status == 'in_progress' and not instance.started_at:
             instance.started_at = timezone.now()
+            
+@receiver(post_save, sender=Task)
+def update_project_totals_on_task_save(sender, instance, created, **kwargs):
+    """
+    Automatically recalculate project totals when tasks are created or updated.
+    """
+    project = instance.project
+    project.calculate_total_estimated_days()
+
+
+@receiver(post_delete, sender=Task)
+def update_project_totals_on_task_delete(sender, instance, **kwargs):
+    """
+    Automatically recalculate project totals when tasks are deleted.
+    """
+    project = instance.project
+    project.calculate_total_estimated_days()

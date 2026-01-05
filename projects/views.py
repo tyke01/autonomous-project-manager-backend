@@ -3,9 +3,10 @@ from rest_framework.response import Response
 from rest_framework import status
 from django.shortcuts import get_object_or_404
 from django.db import transaction
+from datetime import timedelta
 
 from .models import Project, Task
-from .serializers import ProjectSerializer 
+from .serializers import ProjectSerializer, TaskSerializer
 from .agents.planner import generate_task_plan
 from .agents.scheduler import recalculate_timeline
 
@@ -47,6 +48,11 @@ class ProjectCreateAPIView(APIView):
                         estimated_days=task_data["estimated_days"],
                         order=index
                         )
+                project.calculate_total_estimated_days()
+                
+                if not project.deadline:
+                    buffer_days = int(project.total_estimated_days * 1.1)  # 10% buffer
+                    project.deadline = project.start_date + timedelta(days=buffer_days)
                 
                 project.status = 'active'
                 project.save()
@@ -86,16 +92,6 @@ class ProjectDetailAPIView(APIView):
             status=status.HTTP_204_NO_CONTENT
         )
         
-from rest_framework.views import APIView
-from rest_framework.response import Response
-from rest_framework import status
-from django.shortcuts import get_object_or_404
-from django.db import transaction
-
-from .models import Project, Task
-from .serializers import ProjectSerializer, TaskSerializer
-from .agents.planner import generate_task_plan
-from .agents.scheduler import recalculate_timeline
 
 
 class TaskUpdateAPIView(APIView):
