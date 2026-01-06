@@ -82,3 +82,47 @@ class Task(models.Model):
     
     class Meta:
         ordering = ['order']  # Always return tasks in order
+        
+
+class TaskConversation(models.Model):
+    """
+    Stores AI assistant conversations for a specific task.
+    """
+    task = models.OneToOneField(
+        'Task',
+        on_delete=models.CASCADE,
+        related_name='conversation'
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    def __str__(self):
+        return f"Conversation for {self.task.title}"
+
+
+class ChatMessage(models.Model):
+    """
+    Individual message in a conversation.
+    """
+    ROLE_CHOICES = [
+        ('user', 'User'),
+        ('assistant', 'Assistant'),
+    ]
+    
+    conversation = models.ForeignKey(
+        TaskConversation,
+        on_delete=models.CASCADE,
+        related_name='messages'
+    )
+    role = models.CharField(max_length=20, choices=ROLE_CHOICES)
+    content = models.TextField()
+    timestamp = models.DateTimeField(auto_now_add=True)
+    
+    # Optional: Store metadata (model used, tokens, etc.)
+    metadata = models.JSONField(default=dict, blank=True)
+    
+    class Meta:
+        ordering = ['timestamp']
+    
+    def __str__(self):
+        return f"{self.role}: {self.content[:50]}..."

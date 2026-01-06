@@ -6,6 +6,8 @@ from .views import (
     ProjectDetailAPIView,
     TaskUpdateAPIView,
     TaskGuidanceAPIView,
+    TaskConversationAPIView,
+    TaskConversationClearAPIView,
 )
 
 
@@ -15,4 +17,8 @@ urlpatterns = [
     path('projects/<int:pk>/', ProjectDetailAPIView.as_view(), name='project-detail'),
     path('tasks/<int:pk>/', TaskUpdateAPIView.as_view(), name='task-update'),
     path('tasks/ai-guidance/', TaskGuidanceAPIView.as_view(), name='task-guidance'),
+    path('tasks/<int:task_id>/conversation/',
+         TaskConversationAPIView.as_view(), name='task-conversation'),
+    path('tasks/<int:task_id>/conversation/clear/',
+         TaskConversationClearAPIView.as_view(), name='task-conversation-clear'),
 ]

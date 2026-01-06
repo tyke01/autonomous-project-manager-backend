@@ -5,8 +5,8 @@ from django.shortcuts import get_object_or_404
 from django.db import transaction
 from datetime import timedelta
 
-from .models import Project, Task
-from .serializers import ProjectSerializer, TaskSerializer
+from .models import Project, Task, TaskConversation, ChatMessage
+from .serializers import ProjectSerializer, TaskSerializer, TaskConversationSerializer
 from .agents.planner import generate_task_plan
 from .agents.scheduler import recalculate_timeline
 from .agents.task_assistant import generate_task_guidance
@@ -165,4 +165,104 @@ class TaskGuidanceAPIView(APIView):
             return Response(
                 {"error": str(e)},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+            
+class TaskConversationAPIView(APIView):
+    """
+    GET /api/tasks/<task_id>/conversation/ - Get conversation history
+    POST /api/tasks/<task_id>/conversation/ - Send a new message
+    """
+    
+    def get(self, request, task_id):
+        """Get conversation history for a task"""
+        task = get_object_or_404(Task, pk=task_id)
+        
+        # Get or create conversation
+        conversation, created = TaskConversation.objects.get_or_create(task=task)
+        
+        serializer = TaskConversationSerializer(conversation)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+    
+    def post(self, request, task_id):
+        """Send a new message in the conversation"""
+        task = get_object_or_404(Task, pk=task_id)
+        user_message = request.data.get('message')
+        
+        if not user_message:
+            return Response(
+                {"error": "message is required"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            # Get or create conversation
+            conversation, created = TaskConversation.objects.get_or_create(task=task)
+            
+            # Save user message
+            ChatMessage.objects.create(
+                conversation=conversation,
+                role='user',
+                content=user_message
+            )
+            
+            # Get conversation history
+            history = [
+                {"role": msg.role, "content": msg.content}
+                for msg in conversation.messages.all()
+            ]
+            
+            # If this is the first message, include task context
+            if len(history) == 1:
+                result = generate_task_guidance(
+                    task.title,
+                    task.description,
+                    task.project.goal,
+                    conversation_history=None  # Initial request
+                )
+            else:
+                # Follow-up question
+                result = generate_task_guidance(
+                    task.title,
+                    task.description,
+                    task.project.goal,
+                    conversation_history=history
+                )
+            
+            # Save assistant response
+            ChatMessage.objects.create(
+                conversation=conversation,
+                role='assistant',
+                content=result['content'],
+                metadata=result['metadata']
+            )
+            
+            # Return updated conversation
+            serializer = TaskConversationSerializer(conversation)
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        
+        except Exception as e:
+            return Response(
+                {"error": str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+
+class TaskConversationClearAPIView(APIView):
+    """
+    DELETE /api/tasks/<task_id>/conversation/clear/ - Clear conversation history
+    """
+    def delete(self, request, task_id):
+        task = get_object_or_404(Task, pk=task_id)
+        
+        try:
+            conversation = TaskConversation.objects.get(task=task)
+            conversation.delete()
+            return Response(
+                {"message": "Conversation cleared"},
+                status=status.HTTP_204_NO_CONTENT
+            )
+        except TaskConversation.DoesNotExist:
+            return Response(
+                {"message": "No conversation to clear"},
+                status=status.HTTP_204_NO_CONTENT
             )

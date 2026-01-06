@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Project, Task
+from .models import Project, Task, TaskConversation, ChatMessage
 
 
 class TaskSerializer(serializers.ModelSerializer):
@@ -47,3 +47,16 @@ class ProjectSerializer(serializers.ModelSerializer):
             status__in=['pending', 'in_progress', 'blocked']
         )
         return sum(task.estimated_days for task in incomplete_tasks)
+
+class ChatMessageSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ChatMessage
+        fields = ('id', 'role', 'content', 'timestamp', 'metadata')
+
+
+class TaskConversationSerializer(serializers.ModelSerializer):
+    messages = ChatMessageSerializer(many=True, read_only=True)
+    
+    class Meta:
+        model = TaskConversation
+        fields = ('id', 'task', 'messages', 'created_at', 'updated_at')
