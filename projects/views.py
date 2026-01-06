@@ -9,6 +9,7 @@ from .models import Project, Task
 from .serializers import ProjectSerializer, TaskSerializer
 from .agents.planner import generate_task_plan
 from .agents.scheduler import recalculate_timeline
+from .agents.task_assistant import generate_task_guidance
 
 
 class ProjectListAPIView(APIView):
@@ -137,3 +138,31 @@ class TaskUpdateAPIView(APIView):
             response_data['timeline_update'] = recalculation_result
         
         return Response(response_data, status=status.HTTP_200_OK)
+    
+    
+class TaskGuidanceAPIView(APIView):
+    """
+    POST /api/tasks/ai-guidance/ - Get AI guidance for a specific task
+    """
+    def post(self, request):
+        task_title = request.data.get('task_title')
+        task_description = request.data.get('task_description')
+        project_goal = request.data.get('project_goal')
+        
+        if not all([task_title, task_description, project_goal]):
+            return Response(
+                {"error": "task_title, task_description, and project_goal are required"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            guidance = generate_task_guidance(task_title, task_description, project_goal)
+            return Response(
+                {"guidance": guidance},
+                status=status.HTTP_200_OK
+            )
+        except Exception as e:
+            return Response(
+                {"error": str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
