@@ -35,6 +35,7 @@ class ProjectSerializer(serializers.ModelSerializer):
             'total_estimated_days',
             'actual_days_spent',
             'remaining_days',
+            'completed_at',
             'tasks'
         )
         read_only_fields = ('id', 'start_date',
@@ -48,6 +49,7 @@ class ProjectSerializer(serializers.ModelSerializer):
         )
         return sum(task.estimated_days for task in incomplete_tasks)
 
+
 class ChatMessageSerializer(serializers.ModelSerializer):
     class Meta:
         model = ChatMessage
@@ -56,7 +58,7 @@ class ChatMessageSerializer(serializers.ModelSerializer):
 
 class TaskConversationSerializer(serializers.ModelSerializer):
     messages = ChatMessageSerializer(many=True, read_only=True)
-    
+
     class Meta:
         model = TaskConversation
         fields = ('id', 'task', 'messages', 'created_at', 'updated_at')

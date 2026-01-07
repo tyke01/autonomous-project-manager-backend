@@ -20,6 +20,7 @@ class Project(models.Model):
     
     total_estimated_days = models.IntegerField(default=0) 
     actual_days_spent = models.IntegerField(default=0)
+    completed_at = models.DateTimeField(null=True, blank=True)
     
 
     def __str__(self):
@@ -47,6 +48,36 @@ class Project(models.Model):
         
         new_deadline = timezone.now().date() + timezone.timedelta(days=remaining_days)
         return new_deadline, remaining_days
+    def check_and_update_status(self):
+        """
+        Automatically update project status based on task completion.
+        Returns True if status was changed.
+        """
+        from django.utils import timezone
+        
+        tasks = self.tasks.all()
+        
+        # If no tasks, keep current status
+        if not tasks.exists():
+            return False
+        
+        # Check if all tasks are completed
+        all_completed = all(task.status == 'completed' for task in tasks)
+        
+        if all_completed and self.status != 'completed':
+            self.status = 'completed'
+            self.completed_at = timezone.now()
+            self.save()
+            return True
+        
+        # Check if project should be active (has tasks but not all completed)
+        if not all_completed and self.status == 'completed':
+            self.status = 'active'
+            self.completed_at = None
+            self.save()
+            return True
+        
+        return False
     
 
 class Task(models.Model):

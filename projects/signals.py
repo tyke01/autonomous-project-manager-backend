@@ -50,6 +50,7 @@ def update_project_totals_on_task_save(sender, instance, created, **kwargs):
     """
     project = instance.project
     project.calculate_total_estimated_days()
+    status_changed = project.check_and_update_status()
 
 
 @receiver(post_delete, sender=Task)
@@ -59,3 +60,4 @@ def update_project_totals_on_task_delete(sender, instance, **kwargs):
     """
     project = instance.project
     project.calculate_total_estimated_days()
+    project.check_and_update_status()
